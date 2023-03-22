@@ -1,26 +1,26 @@
 { # The files would be going to ~/.config/doom (~/.doom.d)
-  doomPrivateDir
-  /* A Doom configuration directory from which to build the Emacs package environment.
+doomPrivateDir
+/* A Doom configuration directory from which to build the Emacs package environment.
 
-     Can be used, for instance, to prevent rebuilding the Emacs environment
-     each time the `config.el` changes.
+   Can be used, for instance, to prevent rebuilding the Emacs environment
+   each time the `config.el` changes.
 
-     Can be provided as a directory or derivation. If not given, package
-     environment is built against `doomPrivateDir`.
+   Can be provided as a directory or derivation. If not given, package
+   environment is built against `doomPrivateDir`.
 
-     Example:
-       doomPackageDir = pkgs.linkFarm "my-doom-packages" [
-         # straight needs a (possibly empty) `config.el` file to build
-         { name = "config.el"; path = pkgs.emptyFile; }
-         { name = "init.el"; path = ./doom.d/init.el; }
-         {
-           name = "packages.el";
-           path = pkgs.writeText "packages.el" "(package! inheritenv)";
-         }
-         { name = "modules"; path = ./my-doom-module; }
-       ];
-   */
-,  doomPackageDir ? doomPrivateDir
+   Example:
+     doomPackageDir = pkgs.linkFarm "my-doom-packages" [
+       # straight needs a (possibly empty) `config.el` file to build
+       { name = "config.el"; path = pkgs.emptyFile; }
+       { name = "init.el"; path = ./doom.d/init.el; }
+       {
+         name = "packages.el";
+         path = pkgs.writeText "packages.el" "(package! inheritenv)";
+       }
+       { name = "modules"; path = ./my-doom-module; }
+     ];
+*/
+, doomPackageDir ? doomPrivateDir
   /* Extra packages to install
 
      Useful for non-emacs packages containing emacs bindings (e.g.
@@ -29,7 +29,8 @@
      Example:
        extraPackages = epkgs: [ pkgs.mu ];
   */
-, extraPackages ? epkgs: [ ]
+, extraPackages ? epkgs:
+  [ ]
   /* Extra configuration to source during initialization
 
      Use this to refer other nix derivations.
@@ -45,18 +46,19 @@
      Only used to get emacs package, if `bundledPackages` is set.
   */
 , emacsPackages
-  /* Overlay to customize emacs (elisp) dependencies
+/* Overlay to customize emacs (elisp) dependencies
 
-     See overrides.nix for addition examples.
+   See overrides.nix for addition examples.
 
-     Example:
-       emacsPackagesOverlay = final: prev: {
-         magit-delta = super.magit-delta.overrideAttrs (esuper: {
-           buildInputs = esuper.buildInputs ++ [ pkgs.git ];
-         });
-       };
-  */
-, emacsPackagesOverlay ? final: prev: { }
+   Example:
+     emacsPackagesOverlay = final: prev: {
+       magit-delta = super.magit-delta.overrideAttrs (esuper: {
+         buildInputs = esuper.buildInputs ++ [ pkgs.git ];
+       });
+     };
+*/
+, emacsPackagesOverlay ? final: prev:
+  { }
   /* Use bundled revision of github.com/nix-community/emacs-overlay
      as `emacsPackages`.
   */
@@ -73,10 +75,9 @@
          "emacs-overlay" = fetchFromGitHub { owner = /* ...*\/; };
        };
   */
-, dependencyOverrides ? { }
-, lib, pkgs, stdenv, buildEnv, makeWrapper
-, runCommand, fetchFromGitHub, writeShellScript
-, writeShellScriptBin, writeTextDir }:
+, dependencyOverrides ? { }, lib, pkgs, stdenv, buildEnv, makeWrapper
+, runCommand, fetchFromGitHub, writeShellScript, writeShellScriptBin
+, writeTextDir }:
 
 assert (lib.assertMsg ((builtins.isPath doomPrivateDir)
   || (lib.isDerivation doomPrivateDir) || (lib.isStorePath doomPrivateDir))
@@ -84,14 +85,12 @@ assert (lib.assertMsg ((builtins.isPath doomPrivateDir)
 
 let
   isEmacs29 = lib.versionAtLeast emacsPackages.emacs.version "29";
-  flake =
-    (import
-      (let lock = with builtins; fromJSON (readFile ./flake.lock); in
-       builtins.fetchTarball {
-         url = "https://github.com/edolstra/flake-compat/archive/${lock.nodes.flake-compat.locked.rev}.tar.gz";
-         sha256 = lock.nodes.flake-compat.locked.narHash;
-       })
-      { src = ./.; }).defaultNix;
+  flake = (import (let lock = with builtins; fromJSON (readFile ./flake.lock);
+  in builtins.fetchTarball {
+    url =
+      "https://github.com/edolstra/flake-compat/archive/${lock.nodes.flake-compat.locked.rev}.tar.gz";
+    sha256 = lock.nodes.flake-compat.locked.narHash;
+  }) { src = ./.; }).defaultNix;
   lock = p:
     if dependencyOverrides ? ${p} then
       dependencyOverrides.${p}
@@ -107,9 +106,7 @@ let
     name = "doom-src";
     src = lock "doom-emacs";
     phases = [ "unpackPhase" "patchPhase" "installPhase" ];
-    patches = [
-      ./patches/fix-paths.patch
-    ];
+    patches = [ ./patches/fix-paths.patch ];
     installPhase = ''
       mkdir -p $out
       cp -r * $out
@@ -193,7 +190,8 @@ let
     src = doomSrc;
 
     patches = [
-      ./patches/nix-integration.patch
+      ./patches/nix-integration/0001-Remove-support-for-profiles-and-init-directory.patch
+      ./patches/nix-integration/0002-Always-use-XDG-paths-for-data-cache-state-dirs.patch
     ];
 
     buildPhase = ''
@@ -228,8 +226,8 @@ let
   emacs = let
     load-config-from-site = writeTextDir "share/emacs/site-lisp/default.el" ''
       (message "doom-emacs is not placed in `doom-private-dir', loading from `site-lisp'")
-      ${# TODO: remove once Emacs 29+ is released and commonly available
-        lib.optionalString (!isEmacs29) ''
+      ${ # TODO: remove once Emacs 29+ is released and commonly available
+      lib.optionalString (!isEmacs29) ''
         (load "${doom-emacs}/early-init.el")
       ''}
       (load "${doom-emacs}/lisp/doom.el")
